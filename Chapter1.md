@@ -29,7 +29,7 @@ we can do such things as:
 3. We can also define invariants that must hold such as the balance of an account 
    when queried at time `t` at any given branch must always evaluate to the sum of the deposits minus the sum of the withdrawls up to time `t`
 4. Use axioms provided by the framework to derive transformations that allow
-   to prove our invariants hold or don't across time
+   us to prove our invariants hold or don't across time
 
 We're not going to go into the mechanics of how these things are done, but suffice
 it to say it can be done. The name of the fields that emerged to solve these
@@ -38,14 +38,12 @@ computability more broadly) and process calculi when time is involved.
 
 Process calculi that deal with distrubted systems often employ message passing
 to enable communication between processes and atomic actions to reason about
-transiation between process states in a system. One such process calculus that
+transitions between process states in a system. One such process calculus that
 did this was called Temporal Logic of Actions, upon which Bluespec is based.
 
 
-Footnotes - Solution to Bank Consensus:
+# Footnotes - A Possible Solution to Bank Consensus:
 
-
-## A First Solution: Quorum
 
 A natural fix for `withdraw` is to require that before any branch commits a withdrawal, it must consult a **majority** of all branches — specifically, more than half:
 

@@ -33,13 +33,18 @@ we can do such things as:
 
 We're not going to go into the mechanics of how these things are done, but suffice
 it to say it can be done. The name of the fields that emerged to solve these
-problems are collectively referred to as logic systems, calculi(when talking about
-computability more broadly) and process calculi when time is involved.
+problems are collectively referred to as logic systems, calculi (when talking about
+computability more broadly), and formal specification languages or process calculi
+when concurrency and time are involved.
 
 Process calculi that deal with distributed systems often employ message passing
 to enable communication between processes and atomic actions to reason about
-transitions between process states in a system. One such process calculus that
-did this was called Temporal Logic of Actions, upon which Bluespec is based.
+transitions between process states in a system. A related but distinct formalism
+is *Temporal Logic of Actions* (TLA+), which models a system as a set of atomic
+state transitions over time. Bluespec's formal foundation is *guarded atomic
+actions* from Term Rewriting Systems (TRS) — a model developed by Arvind et al.
+at MIT — but it shares TLA+'s core intuition that the right primitive for
+reasoning about concurrent systems is an action that fires atomically or not at all.
 
 
 # Footnotes - A Possible Solution to Bank Consensus:

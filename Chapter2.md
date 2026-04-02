@@ -24,7 +24,7 @@ I think there's probably a connection to be made between message passing
 in Rust between threads using `mpsc` and message passing in Bluespec using
 FIFOs - but I haven't thought through this too deeply.
 
-# Bluespec Haskell and It's Type System
+# Bluespec Haskell and Its Type System
 
 So far, we've dealt with the fact that Bluespec allows you to run 
 concurrent processes that update atomically and can communicate via

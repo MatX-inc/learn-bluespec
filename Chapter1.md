@@ -1,6 +1,6 @@
 # Setting the Stage For Bluespec
 The core insight of Bluespec is that chips are essentially distributed systems
-like bank or business databases except much tinier. Banks and business
+like bank or business databases except much tinier. Banks and businesses
 have many geographically distinct branches that independently perform their
 own operations and must periodically sync accounts and records. Likewise,
 chips have many different functional units that operate independently and
@@ -19,7 +19,7 @@ This is an instance of a coherence problem — a class of problems that arise wh
 ## Solutions To Divergent Behavior
 
 There are entire branches of mathematics dedicated to modeling computation and
-how comptuations can evolve over time. Within these mathematical frameworks,
+how computations can evolve over time. Within these mathematical frameworks,
 we can do such things as:
 
 1. Define systems of equations that let us represent different parts
@@ -36,7 +36,7 @@ it to say it can be done. The name of the fields that emerged to solve these
 problems are collectively referred to as logic systems, calculi(when talking about
 computability more broadly) and process calculi when time is involved.
 
-Process calculi that deal with distrubted systems often employ message passing
+Process calculi that deal with distributed systems often employ message passing
 to enable communication between processes and atomic actions to reason about
 transitions between process states in a system. One such process calculus that
 did this was called Temporal Logic of Actions, upon which Bluespec is based.

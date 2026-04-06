@@ -8,7 +8,7 @@ Everybody emerges with superpowers. No exceptions.
 A guided introduction to [Bluespec](https://github.com/B-Lang-org/bsc), a
 hardware description language built on two big ideas:
 
-1. Chips are distributed systems, and distributed systems need **atomic actions**
+1. Chips are tiny distributed systems, and distributed systems(of any size) need **atomic actions**
    to stay correct.
 2. The right language for describing those actions is one with a serious type
    system — which is why Bluespec is built on Haskell.

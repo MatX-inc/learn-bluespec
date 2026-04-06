@@ -11,21 +11,51 @@ Rewriting Systems).
 - **Chapter 2** (`Chapter2.md`) — In progress. Covers Bluespec's message-passing
   primitives (Registers, Wires, FIFOs) and begins motivating the type system.
 - **Chapter 3** — Not yet written. Will introduce Haskell to students.
-- **Chapter 4** — Not yet written. Plan is at `chapter4/PLAN.md`.
+- **Chapter 4** (`chapter4.ipynb`) — Complete as a notebook. Parser combinators without
+  monads; builds a full calculator parser. Plan at `chapter4/PLAN.md`.
 
-## Chapter 4 — What Needs to Be Done
+## Chapter 4 — Status
 
-Write `Chapter4.md` and the accompanying code in `chapter4/`. Full plan is in
-`chapter4/PLAN.md`. Summary:
+The notebook `chapter4.ipynb` is complete and executes cleanly. It covers:
 
-- Build a minimal parser combinator library from scratch in Haskell
-- Implement Functor, Applicative, Monad instances on the `Parser` type
-- Parse simple calculator expressions (`+`, `-`, `*`, `/`, parentheses, integers)
-- Show the calculator parser built twice: raw `>>=` style and do notation style
-- Close with an explicit bridge to Bluespec's `Action`/`ActionValue#` monad
+- `ParseResult`/`Parser` types, `item`, `satisfy`, `char`, `digit`
+- `<|>` (choice), `many`/`some`, `natural`
+- `andThen`, `yield`, `chain`, and the full calculator grammar
+- Closes with motivation for Chapter 5 (monads)
 
-**Code files:** `chapter4/Parser.hs` and `chapter4/Calculator.hs`
-**Tutorial file:** `Chapter4.md`
+**Note:** The Functor/Applicative/Monad section and do-notation rewrite are deferred
+to Chapter 5 per the revised plan.
+
+## Running Notebooks
+
+IHaskell is installed via Stack. Jupyter is installed via pip3 into
+`~/Library/Python/3.9/bin/`. The IHaskell kernel must be registered **without**
+the `--stack` flag:
+
+```bash
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"
+stack exec -- ihaskell install   # no --stack flag here
+```
+
+To execute a notebook in-place:
+
+```bash
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"
+jupyter nbconvert --to notebook --execute chapter4.ipynb --output chapter4.ipynb
+```
+
+### Known GHC 9.10.3 aarch64 bug
+
+GHC 9.10.3 has an RTS bug (`ARR_WORDS object entered!`) triggered when custom
+data types are defined in a kernel session and then certain standard library
+functions are imported and used. Confirmed bad: all of `Data.Char`, `Data.List.sort`,
+`Data.List.nub`. Confirmed fine: `Data.List.isPrefixOf`, `isInfixOf`, `intercalate`,
+and pure Prelude. The pattern is inconsistent — do not try to reason about which
+imports are safe. **Safe rule: no `import` statements in notebooks at all.** Implement
+any helpers from first principles (e.g. `c >= '0' && c <= '9'` instead of `isDigit`).
+
+**Code files:** `chapter4/Parser.hs` and `chapter4/Calculator.hs` (standalone GHCi/ghc versions)
+**Notebook:** `chapter4.ipynb`
 
 ## Writing Style
 

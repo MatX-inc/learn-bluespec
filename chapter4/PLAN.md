@@ -15,24 +15,32 @@ separately.
 - **No type signatures inside `where` clauses in multi-definition cells** —
   causes a parse error. Single-definition cells tolerate them fine. Omit `where`
   type sigs throughout; the top-level signatures are sufficient.
-- **Imports and definitions must be in separate cells** — mixing an `import`
-  with function definitions in the same cell can crash the kernel.
-- **GHC version matters** — IHaskell must be built against GHC 9.6.x (LTS 22).
-  GHC 9.10.3 triggers an `ARR_WORDS object entered!` runtime crash.
+- **Avoid all `import` statements** — see the GHC bug note below. Whether the
+  import is in its own cell or mixed with definitions makes no difference to the
+  crash.
+- **GHC 9.10.3 aarch64 bug** — GHC 9.10.3 works for most code but has a kernel-
+  crashing RTS bug (`ARR_WORDS object entered!`) triggered by importing certain
+  standard library functions (all of `Data.Char`, `Data.List.sort`,
+  `Data.List.nub`, and others) when custom data types are defined in the same
+  kernel session. The bug is inconsistent — some imports work fine. **Safe rule:
+  avoid all `import` statements in notebooks; implement helpers from first
+  principles using only Prelude.**
 
 ## Code Layout
 
-- `chapter4/Parser4.hs` — parser implementation for Chapter 4 (no monads)
-- `chapter5/Parser5.hs` — parser implementation for Chapter 5 (with Monad)
-- `chapter6/Parser6.hs` — idiomatic final version
-- `chapterN/Calculator.hs` — calculator built on each chapter's parser
+All code lives directly in the notebooks. There are no separate `.hs` files —
+earlier plans for per-chapter `.hs` files were abandoned in favour of keeping
+everything self-contained in the notebook cells.
 
-Each chapter's notebook imports from its own `.hs` file so notebook cells
-stay focused on concepts, not boilerplate.
+- `chapter4.ipynb` — **complete**
+- `chapter5.ipynb` — not yet written
+- `chapter6.ipynb` — not yet written
 
 ---
 
-## Chapter 4 — Parser Combinators Without Monads
+## Chapter 4 — Parser Combinators Without Monads ✓ COMPLETE
+
+**Notebook:** `chapter4.ipynb` — executes cleanly end-to-end.
 
 **Goal:** Build a working parser by explicit pattern matching and threading.
 No `>>=`, no `do`, no anonymous functions, no `$`. Every step named, every

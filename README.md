@@ -26,16 +26,42 @@ are closer than you think.
 | [Chapter 1](Chapter1.md) | Complete | Chips as distributed systems, coherence problems, atomic actions, Bluespec's TRS foundation |
 | [Chapter 2](Chapter2.md) | In progress | Bluespec's message-passing primitives; circuit design as functional programming |
 | Chapter 3 | Not started | Introduction to Haskell |
-| [Chapter 4](Chapter4.md) | Complete | Parser combinators in Haskell; the monad bridge to Bluespec's `Action` type |
+| [Chapter 4](chapter4.ipynb) | Complete | Parser combinators in Haskell — building a calculator parser from scratch |
 
-## Running the code
+## Running the notebooks
 
-Chapter 4 has runnable Haskell. You'll need GHC installed.
+Chapters 4 and beyond are [IHaskell](https://github.com/gibiansky/IHaskell) Jupyter
+notebooks. You can read them on GitHub without any setup. To run them interactively:
 
+### Dependencies
+
+- [Stack](https://docs.haskellstack.org/en/stable/) — Haskell build tool
+- IHaskell — install via Stack (see the IHaskell README for one-time setup)
+- Jupyter — `pip3 install jupyter nbconvert`
+
+### Register the kernel (once)
+
+```bash
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"   # or wherever pip3 installed jupyter
+stack exec -- ihaskell install
 ```
-cd chapter4
-make run
+
+### Open a notebook
+
+```bash
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"
+jupyter notebook chapter4.ipynb
 ```
+
+### Execute a notebook non-interactively
+
+```bash
+export PATH="$PATH:$HOME/Library/Python/3.9/bin"
+jupyter nbconvert --to notebook --execute chapter4.ipynb --output chapter4.ipynb
+```
+
+> **Note:** If `ihaskell install` was previously run with a `--stack` flag, re-run it
+> without that flag — the flag prevents the kernel from starting under `nbconvert`.
 
 ## Prerequisites
 

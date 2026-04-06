@@ -7,6 +7,19 @@ on GitHub and let students run code inline without a separate GHCi session.
 Setup requires `stack` + IHaskell; a setup guide and help channel are provided
 separately.
 
+### IHaskell constraints discovered during authoring
+
+- **No `:{/:}` multi-line blocks** — IHaskell does not support GHCi directives.
+  Mutually recursive definitions (e.g. `many`/`some`, `expr`/`term`/`factor`)
+  just go in the same cell; IHaskell handles mutual recursion natively.
+- **No type signatures inside `where` clauses in multi-definition cells** —
+  causes a parse error. Single-definition cells tolerate them fine. Omit `where`
+  type sigs throughout; the top-level signatures are sufficient.
+- **Imports and definitions must be in separate cells** — mixing an `import`
+  with function definitions in the same cell can crash the kernel.
+- **GHC version matters** — IHaskell must be built against GHC 9.6.x (LTS 22).
+  GHC 9.10.3 triggers an `ARR_WORDS object entered!` runtime crash.
+
 ## Code Layout
 
 - `chapter4/Parser4.hs` — parser implementation for Chapter 4 (no monads)

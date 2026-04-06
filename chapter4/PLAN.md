@@ -1,79 +1,150 @@
-# Chapter 4 Plan: Building a Parser Combinator in Haskell
+# Chapters 4–6 Plan: Parser Combinators → Monads → Idiomatic Haskell
 
-## Goal
+## Format
 
-Before students write Bluespec Haskell, they need experience with regular Haskell in a
-forgiving environment (good compiler errors, good tooling). Chapter 4 builds a minimal but
-fully functional parser combinator from scratch, culminating in a calculator expression
-parser. The monad pattern encountered here directly foreshadows Bluespec's `Action` monad.
+All three chapters are **IHaskell Jupyter notebooks** (`.ipynb`). They render
+on GitHub and let students run code inline without a separate GHCi session.
+Setup requires `stack` + IHaskell; a setup guide and help channel are provided
+separately.
 
-## Assumptions
+## Code Layout
 
-- Students have passing familiarity with Haskell functions and types (covered in Chapter 3).
-- No prior knowledge of parser combinators or monads.
+- `chapter4/Parser4.hs` — parser implementation for Chapter 4 (no monads)
+- `chapter5/Parser5.hs` — parser implementation for Chapter 5 (with Monad)
+- `chapter6/Parser6.hs` — idiomatic final version
+- `chapterN/Calculator.hs` — calculator built on each chapter's parser
 
-## Code Layout (`./chapter4/`)
+Each chapter's notebook imports from its own `.hs` file so notebook cells
+stay focused on concepts, not boilerplate.
 
-- `Parser.hs` — the `Parser` type, typeclass instances (Functor, Applicative, Monad),
-  primitive parsers (`item`, `satisfy`, `char`, `digit`, `natural`), and combinators
-  (`<|>`, `many`, `some`).
-- `Calculator.hs` — the calculator parser built twice: once without do notation (raw `>>=`
-  and `>>` chains), once with do notation. Includes a `main` that demos both.
+---
 
-`Calculator.hs` imports from `Parser.hs` — explicit module separation is intentional and
-worth calling out in the text.
+## Chapter 4 — Parser Combinators Without Monads
 
-## Chapter Sections
+**Goal:** Build a working parser by explicit pattern matching and threading.
+No `>>=`, no `do`, no anonymous functions, no `$`. Every step named, every
+field named. Students should feel the verbosity — that's the point.
 
-### 1. Why Parser Combinators?
-Brief motivation. Higher-order functions and types working together in a concrete,
-runnable project. Foreshadow the connection to Bluespec's `Action` monad.
+### Principles
+- No `$` operator
+- No anonymous functions (`\x -> ...`)
+- Named field construction everywhere (`ParseOk { consumed = x, remaining = r }`)
+- No `do` notation
+- No `>>=` or `>>`
 
-### 2. The Parser Type
-Define `Parser a` as a `newtype` wrapping `String -> Maybe (a, String)`. Explain what the
-type means: takes remaining input, returns either failure (`Nothing`) or a parsed value
-plus unconsumed input. Introduce `runParser` as the unwrapper.
+### Sections
 
-### 3. Primitive Parsers
-`item`, `satisfy`, `char`, `digit`, `natural` (multi-digit integers). Small, concrete,
-immediately testable in GHCi.
+1. **What is a parser?**
+   Left-to-right consumption, the `(recognized, remainder)` pair, how parsers
+   chain by handing off the unconsumed tail. Wrong turns and backtracking —
+   the explicit-stack mental model, and why immutable strings give us
+   backtracking for free.
 
-### 4. Functor → Applicative → Monad
-Implement in order — GHC requires it (Monad has Applicative as a superclass, Applicative
-has Functor). Don't treat this as a detour; explain *why* the ordering is forced and what
-each instance buys us. For Monad, implement `>>=` and `>>`. This is the minimum needed for
-do notation.
+2. **The types**
+   `ParseResult` with `NoParse` and `ParseOk { consumed, remaining }`.
+   `Parser` as a `data` wrapper around a function. Explain record field
+   extraction explicitly — `runParser p` is just pulling the function out
+   of the wrapper. `newtype` aside deferred to Chapter 6.
 
-### 5. Combinators
-`<|>` (choice/alternation), `many`, `some`. Note: `many` applied to a parser that never
-fails will loop forever — call this out explicitly.
+3. **`item` — the only primitive**
+   The one parser that directly touches the input string. Walk through the
+   pattern match step by step.
 
-### 6. Small Do/Raw Comparison
-Before the full calculator, show the mechanical equivalence of do notation vs raw `>>=`
-on a tiny 2-parser sequence. Make the "desugaring" obvious before the complexity ramps up.
+4. **Building bigger parsers from small ones**
+   This is function composition. Hit that point explicitly before writing
+   any more parsers. Small parsers combined into larger ones, all the way up.
 
-### 7. The Calculator Grammar
-State the grammar as BNF before writing any code:
+5. **`satisfy` — parsing with a condition**
+   Motivate it first: sometimes you only want to consume a character if it
+   meets a test (is it a digit? a letter?). Implement using explicit pattern
+   matching on the result of `item`, not `do` notation.
 
-```
-expr   ::= term (('+' | '-') term)*
-term   ::= factor (('*' | '/') factor)*
-factor ::= natural | '(' expr ')'
-```
+6. **`char`, `digit`, `natural`**
+   Each one built from the last. Emphasize the compositional chain.
 
-Parentheses are included deliberately — they force a recursive parser structure that
-illustrates why combinators are powerful. This mirrors the formal specification mindset
-used in Bluespec design.
+7. **`<|>` — choice**
+   Try one parser, fall back to another. Explicit case match, no magic.
 
-### 8. Building the Parser — Raw Style
-Implement `expr`, `term`, `factor` using explicit `>>=` and `>>` chains. No do notation.
-It should feel slightly painful to read. That contrast is the point.
+8. **`many` and `some`**
+   Repetition. Warn about infinite loops explicitly.
 
-### 9. Building the Parser — Do Notation
-Same logic, same structure, dramatically more readable. Students should feel the relief.
+9. **The calculator — explicit threading**
+   Build `expr`/`term`/`factor` by explicitly passing `remaining` from one
+   result into the next parser by name. It's verbose. That's intentional.
+   Students should feel why something better is needed.
 
-### 10. The Bridge to Bluespec
-Explicit callout: `Parser a` is structurally identical to `ActionValue#(a)`. Parsers
-consume input sequentially; actions sequence atomically. The monad is the design pattern
-for "computation that threads some implicit state." This is what Bluespec's do blocks are
-doing inside rules.
+---
+
+## Chapter 5 — Introducing the Monad as a Sequencer
+
+**Goal:** Name the pattern from Chapter 4. The explicit threading of `remaining`
+into each next parser is a pattern — it has a name, and we can encode it once
+and reuse it. That encoding is the Monad. Introduce `>>=` and `>>` as the
+tools; defer `do` notation until the very end of the chapter as a reveal.
+
+### Principles
+- Introduce `Functor` and `Applicative` as required steppingstones to `Monad`,
+  but keep explanations brief — they're prerequisites, not the destination
+- Explain `Monad` as: "sequence two parsers, automatically threading `remaining`"
+- Build everything with `>>=` and `>>` first
+- `do` notation arrives at the end as syntactic sugar — show the mechanical
+  desugaring, then rewrite the calculator in `do` style
+- Still no `$`, still named fields, still no anonymous functions until `>>=`
+  makes lambdas unavoidable
+
+### Sections
+
+1. **The problem with Chapter 4**
+   Show a multi-step parse from Chapter 4. Count how many times `remaining`
+   appears. This is the noise we want to eliminate.
+
+2. **The pattern has a name**
+   The threading of state from one step to the next is a Monad. Introduce
+   `>>=` as "run this parser, take what it consumed, produce the next parser,
+   run that on the remaining input."
+
+3. **Functor and Applicative — required groundwork**
+   GHC requires them. Implement them, explain what each adds, move on.
+   Show `NoParse` propagation explicitly in each instance.
+
+4. **The Monad instance**
+   Implement `>>=`. Walk through how it eliminates the explicit `remaining`
+   threading from Chapter 4.
+
+5. **Rewriting the primitives with `>>=`**
+   `satisfy`, `char`, `digit`, `natural` — rewritten using `>>=` and `>>`.
+
+6. **The calculator with `>>=`**
+   Same calculator as Chapter 4, now using explicit `>>=` chains. Still
+   slightly painful to read — but less noisy than Chapter 4.
+
+7. **`do` notation — the reveal**
+   Show the mechanical desugaring. Rewrite the calculator in `do` style.
+   Students should feel the relief.
+
+8. **Bridge to Bluespec**
+   `Parser a` ↔ `ActionValue#(a)`. The table. The Bluespec rule example.
+
+---
+
+## Chapter 6 — Idiomatic Haskell
+
+**Goal:** Take Chapter 5 and rewrite it the way an experienced Haskell
+programmer would actually write it. Introduce `$`, anonymous functions,
+`newtype`, and drop named field construction. Students now understand what
+the idioms are *doing* because they've built the verbose version themselves.
+
+### Principles
+- Introduce `$` and explain why it exists
+- Anonymous functions (`\x -> ...`) used freely
+- `newtype` instead of `data` for `Parser` — revisit the aside from Chapter 4
+- Named field construction dropped in favor of positional or pattern style
+- Point out each transformation from Chapter 5 and explain the idiom
+
+### Sections
+
+1. **`$` — avoiding parentheses**
+2. **Anonymous functions**
+3. **`newtype` — the zero-cost wrapper**
+4. **Dropping named fields**
+5. **The full idiomatic rewrite side-by-side with Chapter 5**

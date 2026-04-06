@@ -2,34 +2,44 @@ module Parser where
 
 import Data.Char (isDigit)
 
-newtype Parser a = Parser { runParser :: String -> Maybe (a, String) }
+data ParseResult a
+  = NoParse
+  | ParseOk { consumed :: a, remaining :: String }
+  deriving Show
+
+data Parser a = Parser { runParser :: String -> ParseResult a }
 
 -- ── Typeclass instances ───────────────────────────────────────────────────────
 
 instance Functor Parser where
-  fmap f p = Parser $ \input -> do
-    (x, rest) <- runParser p input
-    return (f x, rest)
+  fmap f p = Parser $ \input ->
+    case runParser p input of
+      NoParse                              -> NoParse
+      ParseOk { consumed = x, remaining = r } -> ParseOk { consumed = f x, remaining = r }
 
 instance Applicative Parser where
-  pure x = Parser $ \input -> Just (x, input)
-  pf <*> px = Parser $ \input -> do
-    (f, rest1) <- runParser pf input
-    (x, rest2) <- runParser px rest1
-    return (f x, rest2)
+  pure x = Parser $ \input -> ParseOk { consumed = x, remaining = input }
+  pf <*> px = Parser $ \input ->
+    case runParser pf input of
+      NoParse                              -> NoParse
+      ParseOk { consumed = f, remaining = r1 } ->
+        case runParser px r1 of
+          NoParse                              -> NoParse
+          ParseOk { consumed = x, remaining = r2 } -> ParseOk { consumed = f x, remaining = r2 }
 
 instance Monad Parser where
   return = pure
-  p >>= f = Parser $ \input -> do
-    (x, rest) <- runParser p input
-    runParser (f x) rest
+  p >>= f = Parser $ \input ->
+    case runParser p input of
+      NoParse                              -> NoParse
+      ParseOk { consumed = x, remaining = r } -> runParser (f x) r
 
 -- ── Choice combinator ─────────────────────────────────────────────────────────
 
 (<|>) :: Parser a -> Parser a -> Parser a
 p <|> q = Parser $ \input ->
   case runParser p input of
-    Nothing -> runParser q input
+    NoParse -> runParser q input
     result  -> result
 
 infixl 3 <|>
@@ -40,14 +50,14 @@ infixl 3 <|>
 item :: Parser Char
 item = Parser $ \input ->
   case input of
-    []     -> Nothing
-    (c:cs) -> Just (c, cs)
+    []     -> NoParse
+    (c:cs) -> ParseOk { consumed = c, remaining = cs }
 
 -- Consume one character that satisfies a predicate.
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy p = do
   c <- item
-  if p c then return c else Parser $ \_ -> Nothing
+  if p c then return c else Parser $ \_ -> NoParse
 
 char :: Char -> Parser Char
 char c = satisfy (== c)

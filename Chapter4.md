@@ -54,7 +54,7 @@ image — it's the right mental model.
 In our combinator parser, the call stack *is* the stack. We never actually
 consume input in Haskell's sense; we just pass a `String` down the call chain.
 If a branch fails, the string we passed in never changed — we just return
-`Nothing` and the caller tries something else with the same string it started
+`NoParse` and the caller tries something else with the same string it started
 with. The backtracking is implicit in the function call structure. This is one
 of the pleasant things about functional languages: you get backtracking for
 free because strings are immutable and there's nothing to undo.
@@ -76,27 +76,33 @@ whether it works.
 Everything starts here:
 
 ```haskell
-newtype Parser a = Parser { runParser :: String -> Maybe (a, String) }
+data ParseResult a
+  = NoParse
+  | ParseOk { consumed :: a, remaining :: String }
+
+data Parser a = Parser { runParser :: String -> ParseResult a }
 ```
 
-The type `Parser a` encodes exactly what we just described. It's a function that
-takes a `String` (the remaining input — the part not yet consumed) and returns
-either:
+We have two types. `ParseResult a` is what a parser hands back — either
+`NoParse` (failure, nothing was recognized) or `ParseOk` with two named fields:
+`consumed` is the structure that was recognized (a character, an integer, an
+expression — whatever `a` is), and `remaining` is everything the parser didn't
+touch, ready to be handed to the next parser. Think of it as the parser's
+outgoing message: "here's what I understood, here's what I left for you."
 
-- `Nothing` — the parse failed, or
-- `Just (x, rest)` — it succeeded. `x` is the structure that was recognized
-  (a character, an integer, an expression — whatever type `a` is), and `rest`
-  is everything the parser didn't touch, ready to be handed to the next parser.
-
-Think of `x` as "what I understood" and `rest` as "what I left for you." Every
-parser in this chapter produces exactly one of those pairs on success.
-
-The `newtype` wrapper is just bookkeeping — it lets us attach typeclass instances
-to `Parser` without confusing Haskell into thinking every function from
-`String -> Maybe (a, String)` is a parser. `runParser` unwraps it when we need
-the raw function.
+`Parser a` wraps a function from an input string to a `ParseResult`. The `data`
+wrapper is bookkeeping — it lets us attach typeclass instances to `Parser`
+without Haskell confusing it with every other function of the same shape.
+`runParser` unwraps it when we need the raw function.
 
 That's the whole representation. Everything else is built on top.
+
+> **Aside:** In real Haskell codebases you'll often see `newtype` used instead
+> of `data` when there's a single constructor wrapping a single field. `newtype`
+> carries a compiler guarantee that the wrapper is erased at runtime — zero
+> overhead. For our purposes `data` works identically; the distinction only
+> matters when you care about performance or laziness. Worth knowing when you
+> encounter it.
 
 ## Primitive Parsers
 
@@ -106,11 +112,19 @@ Let's build the simplest possible parsers first.
 item :: Parser Char
 item = Parser $ \input ->
   case input of
-    []     -> Nothing
-    (c:cs) -> Just (c, cs)
+    []     -> NoParse
+    (c:cs) -> ParseOk { consumed = c, remaining = cs }
 ```
 
-`item` consumes exactly one character, or fails on empty input. That's it.
+Inside `item` we define an anonymous function that takes the input string.
+That string is matched on two cases: the empty list `[]`, in which case we
+return `NoParse` (nothing to consume, so the parse fails); and the non-empty
+list, where Haskell's pattern syntax `(c:cs)` simultaneously destructures it
+into the first character `c` and the rest of the string `cs`. We then wrap
+those into a `ParseOk`: `c` is what we consumed, `cs` is what remains.
+
+`item` is the only parser that directly touches the input string. Everything
+else is built on top of it.
 
 From `item` we can build `satisfy`, which consumes one character but only if it
 passes a test:
@@ -119,7 +133,7 @@ passes a test:
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy p = do
   c <- item
-  if p c then return c else Parser $ \_ -> Nothing
+  if p c then return c else Parser $ \_ -> NoParse
 ```
 
 Hold on — there's a `do` block here, but we haven't explained how `do` notation
@@ -151,19 +165,22 @@ of digit characters into an `Int`. Try these in GHCi:
 
 ```
 ghci> runParser (char 'a') "abc"
-Just ('a',"bc")
+ParseOk {consumed = 'a', remaining = "bc"}
 
 ghci> runParser digit "42xyz"
-Just ('4',"2xyz")
+ParseOk {consumed = '4', remaining = "2xyz"}
 
 ghci> runParser natural "123abc"
-Just (123,"abc")
+ParseOk {consumed = 123, remaining = "abc"}
 
 ghci> runParser natural "abc"
-Nothing
+NoParse
 ```
 
-The unconsumed tail is always handed back. That's how the parsers thread together.
+The field names make it easy to see what happened: `consumed` is what the
+parser recognized, `remaining` is what it left for whoever comes next.
+When the parse fails there's nothing to show — just `NoParse`.
+That's how parsers chain — each one picks up where the last one stopped.
 
 ## Functor → Applicative → Monad
 
@@ -179,49 +196,59 @@ This might feel like bureaucracy, but each layer adds something real.
 
 ```haskell
 instance Functor Parser where
-  fmap f p = Parser $ \input -> do
-    (x, rest) <- runParser p input
-    return (f x, rest)
+  fmap f p = Parser $ \input ->
+    case runParser p input of
+      NoParse                                  -> NoParse
+      ParseOk { consumed = x, remaining = r } -> ParseOk { consumed = f x, remaining = r }
 ```
 
-`fmap f p` runs the parser `p`, and if it succeeds, applies `f` to the result.
-The `do` block here is `Maybe`'s do notation — we're just threading the `Maybe`
-that `runParser` returns. What `Functor` buys us: we can transform what a parser
-*produces* without touching the parsing logic itself.
+`fmap f p` runs `p` and inspects the result. If it's `NoParse`, failure
+passes straight through. If it's `ParseOk`, `f` is applied to `consumed`
+and `remaining` is left untouched. What `Functor` buys us: we can transform
+what a parser *produces* without touching the parsing logic itself.
 
 ### Applicative — combining parsers
 
 ```haskell
 instance Applicative Parser where
-  pure x  = Parser $ \input -> Just (x, input)
-  pf <*> px = Parser $ \input -> do
-    (f, rest1) <- runParser pf input
-    (x, rest2) <- runParser px rest1
-    return (f x, rest2)
+  pure x = Parser $ \input -> ParseOk { consumed = x, remaining = input }
+  pf <*> px = Parser $ \input ->
+    case runParser pf input of
+      NoParse                                  -> NoParse
+      ParseOk { consumed = f, remaining = r1 } ->
+        case runParser px r1 of
+          NoParse                                  -> NoParse
+          ParseOk { consumed = x, remaining = r2 } -> ParseOk { consumed = f x, remaining = r2 }
 ```
 
-`pure x` is a parser that always succeeds and returns `x` without consuming any
-input. Useful for injecting a value at the end of a sequence.
+`pure x` is a parser that always succeeds, returning `x` as `consumed` without
+touching the input — `remaining` is the full input unchanged. Useful for
+injecting a plain value at the end of a sequence.
 
-`pf <*> px` runs `pf` to get a function, then runs `px` on the remaining input
-to get an argument, then applies the function. Notice how `rest1` is fed into the
-second `runParser` — the parsers are chained on the unconsumed input. That
-threading of remaining input is the central idea.
+`pf <*> px` runs `pf` first. If it fails, we're done — `NoParse` propagates
+immediately. If it succeeds, we take its `remaining` and feed it into `px`.
+If that also succeeds, we apply `f` (what `pf` consumed) to `x` (what `px`
+consumed) and hand back the final `remaining`. Each `NoParse` branch makes
+failure propagation explicit — there's no invisible machinery doing it for us.
 
 ### Monad — sequential parsing with choices
 
 ```haskell
 instance Monad Parser where
   return = pure
-  p >>= f = Parser $ \input -> do
-    (x, rest) <- runParser p input
-    runParser (f x) rest
+  p >>= f = Parser $ \input ->
+    case runParser p input of
+      NoParse                                  -> NoParse
+      ParseOk { consumed = x, remaining = r } -> runParser (f x) r
 ```
 
-`>>=` (pronounced "bind") is where things get interesting. It runs parser `p`;
-if that succeeds with value `x`, it feeds `x` to `f` to get the *next* parser,
-and runs that on `rest`. The key insight: `f` can *decide what to parse next*
-based on what was just parsed. That makes parsing context-sensitive.
+`>>=` (pronounced "bind") runs `p`, and if it fails, stops immediately with
+`NoParse`. If it succeeds, `consumed` is handed to `f` to produce the *next*
+parser, which then runs on `remaining`. What was recognized becomes the input
+to the next decision; what was left over becomes the input to the next parser.
+The key insight: `f` can decide what to parse next based on what was just
+recognized. That's what makes `do` notation so natural for parsers — each `<-`
+line is one `>>=`, passing its result forward.
 
 `Functor` lets you transform. `Applicative` lets you sequence. `Monad` lets you
 *branch* based on what you've already seen. For our calculator that's overkill —
@@ -237,11 +264,11 @@ alternatives*. For that we define `<|>` ourselves:
 (<|>) :: Parser a -> Parser a -> Parser a
 p <|> q = Parser $ \input ->
   case runParser p input of
-    Nothing -> runParser q input
+    NoParse -> runParser q input
     result  -> result
 ```
 
-Try `p` first. If it fails (`Nothing`), try `q` on the same input. If `p`
+Try `p` first. If it fails (`NoParse`), try `q` on the same input. If `p`
 succeeds, use that result — `q` never runs. This is the "committed choice" of
 parser combinators: no backtracking once a character has been consumed.
 

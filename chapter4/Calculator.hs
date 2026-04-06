@@ -64,9 +64,9 @@ expr = do
 
 eval :: Parser Int -> String -> String
 eval p s = case runParser p s of
-  Just (n, "") -> show n
-  Just (n, r)  -> show n ++ "  (leftover: \"" ++ r ++ "\")"
-  Nothing      -> "parse error"
+  ParseOk { consumed = n, remaining = "" } -> show n
+  ParseOk { consumed = n, remaining = r  } -> show n ++ "  (leftover: \"" ++ r ++ "\")"
+  NoParse                                  -> "parse error"
 
 main :: IO ()
 main = do

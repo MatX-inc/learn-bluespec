@@ -14,28 +14,36 @@ infixl 6 <+>
 newtype Module a = Module { runModule :: [Wire] -> (a, [Wire]) }
 
 instance Functor Module where
-    fmap f m = Module $ \ws ->
-        let (x, ws') = runModule m ws
-        in  (f x, ws')
+    fmap f m = Module fmapFunction
+      where
+        fmapFunction ws = (f x, ws')
+          where
+            (x, ws') = runModule m ws
 
 instance Applicative Module where
     pure x = Module $ \ws -> (x, ws)
-    mf <*> mx = Module $ \ws ->
-        let (f, ws1) = runModule mf ws
+    mf <*> mx = Module apFunction
+      where
+        apFunction ws = (f x, ws2)
+          where
+            (f, ws1) = runModule mf ws
             (x, ws2) = runModule mx ws1
-        in  (f x, ws2)
 
 instance Monad Module where
     return = pure
-    m >>= f = Module $ \ws ->
-        let (x, ws') = runModule m ws
-        in  runModule (f x) ws'
+    m >>= f = Module bindFunction
+      where
+        bindFunction ws = runModule (f x) ws'
+          where
+            (x, ws') = runModule m ws
 
 -- Declare a wire with a name and assign it a value
 wire :: String -> Int -> Module Wire
-wire name val = Module $ \ws ->
-    let w = Wire { wireName = name, wireValue = val }
-    in  (w, ws ++ [w])
+wire name val = Module wireFunction
+  where
+    wireFunction ws = (w, ws ++ [w])
+      where
+        w = Wire { wireName = name, wireValue = val }
 
 -- Run a Module and return the final Wire's value
 evaluate :: Module Wire -> Int

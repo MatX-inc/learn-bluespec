@@ -14,23 +14,22 @@ infixl 6 <+>
 newtype Module a = Module { runModule :: [Wire] -> (a, [Wire]) }
 
 instance Functor Module where
-    fmap f (Module g) = Module $ \ws ->
-        let (x, ws') = g ws
+    fmap f m = Module $ \ws ->
+        let (x, ws') = runModule m ws
         in  (f x, ws')
 
 instance Applicative Module where
     pure x = Module $ \ws -> (x, ws)
-    Module mf <*> Module mx = Module $ \ws ->
-        let (f, ws1) = mf ws
-            (x, ws2) = mx ws1
+    mf <*> mx = Module $ \ws ->
+        let (f, ws1) = runModule mf ws
+            (x, ws2) = runModule mx ws1
         in  (f x, ws2)
 
 instance Monad Module where
     return = pure
-    Module m >>= f = Module $ \ws ->
-        let (x, ws')   = m ws
-            Module g   = f x
-        in  g ws'
+    m >>= f = Module $ \ws ->
+        let (x, ws') = runModule m ws
+        in  runModule (f x) ws'
 
 -- Declare a wire with a name and assign it a value
 wire :: String -> Int -> Module Wire
